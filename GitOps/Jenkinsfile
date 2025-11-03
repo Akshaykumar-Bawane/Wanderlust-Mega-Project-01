@@ -1,125 +1,83 @@
 @Library('Shared') _
 pipeline {
-    agent {label 'vinod'}
-    
+    agent { label 'vinod' }
+
     parameters {
         string(name: 'FRONTEND_DOCKER_TAG', defaultValue: '', description: 'Frontend Docker tag of the image built by the CI job')
         string(name: 'BACKEND_DOCKER_TAG', defaultValue: '', description: 'Backend Docker tag of the image built by the CI job')
     }
 
     stages {
-        stage("Workspace cleanup"){
-            steps{
-                script{
-                    cleanWs()
-                }
+        stage("Workspace cleanup") {
+            steps {
+                cleanWs()
             }
         }
-        
+
         stage('Git: Code Checkout') {
             steps {
-                script{
-                    code_checkout("https://github.com/Akshaykumar-Bawane/Wanderlust-Mega-Project-01.git","main")
+                script {
+                    code_checkout("https://github.com/Akshaykumar-Bawane/Wanderlust-Mega-Project-01.git", "main")
                 }
             }
         }
-        
-        stage('Verify: Docker Image Tags') {
+
+        stage('Update: Kubernetes manifests') {
             steps {
-                script{
-                    echo "FRONTEND_DOCKER_TAG: ${params.FRONTEND_DOCKER_TAG}"
-                    echo "BACKEND_DOCKER_TAG: ${params.BACKEND_DOCKER_TAG}"
+                script {
+                    dir('kubernetes') {
+                        sh """
+                            sed -i 's|wanderlust-backend-beta:.*|wanderlust-backend-beta:${params.BACKEND_DOCKER_TAG}|g' backend.yaml
+                            sed -i 's|wanderlust-frontend-beta:.*|wanderlust-frontend-beta:${params.FRONTEND_DOCKER_TAG}|g' frontend.yaml
+                        """
+                    }
                 }
             }
         }
-        
-        
-        stage("Update: Kubernetes manifests"){
-            steps{
-                script{
-                    dir('kubernetes'){
-                        sh """
-                            sed -i -e s/wanderlust-backend-beta.*/wanderlust-backend-beta:${params.BACKEND_DOCKER_TAG}/g backend.yaml
-                        """
-                    }
-                    
-                    dir('kubernetes'){
-                        sh """
-                            sed -i -e s/wanderlust-frontend-beta.*/wanderlust-frontend-beta:${params.FRONTEND_DOCKER_TAG}/g frontend.yaml
-                        """
-                    }
-                    
-                }
-            }
-        }
-        
-        stage("Git: Code update and push to GitHub"){
-            steps{
-                script{
-                    withCredentials([gitUsernamePassword(credentialsId: 'Github-cred', gitToolName: 'Default')]) {
-                        sh '''
-                        echo "Checking repository status: "
-                        git status
-                    
-                        echo "Adding changes to git: "
-                        git add .
+
+        stage('Deploy to Minikube Cluster') {
+            steps {
+                script {
+                    echo "Deploying to local Minikube cluster..."
+                    sh """
+                        kubectl apply -f kubernetes/backend.yaml
+                        kubectl apply -f kubernetes/frontend.yaml
                         
-                        echo "Commiting changes: "
-                        git commit -m "Updated environment variables"
+                        echo "\\nCurrent pods status:"
+                        kubectl get pods -o wide
                         
-                        echo "Pushing changes to github: "
-                        git push https://github.com/Akshaykumar-Bawane/Wanderlust-Mega-Project-01.git main
-                    '''
-                    }
+                        echo "\\nCurrent services:"
+                        kubectl get svc -o wide
+                    """
                 }
             }
         }
     }
-  post {
+
+    post {
         success {
-            script {
-                emailext attachLog: true,
-                from: 'messier877@gmail.com',
-                subject: "Wanderlust Application has been updated and deployed - '${currentBuild.result}'",
+            emailext(
+                attachLog: true,
+                subject: "✅ Wanderlust deployed successfully to Minikube",
                 body: """
-                    <html>
-                    <body>
-                        <div style="background-color: #FFA07A; padding: 10px; margin-bottom: 10px;">
-                            <p style="color: black; font-weight: bold;">Project: ${env.JOB_NAME}</p>
-                        </div>
-                        <div style="background-color: #90EE90; padding: 10px; margin-bottom: 10px;">
-                            <p style="color: black; font-weight: bold;">Build Number: ${env.BUILD_NUMBER}</p>
-                        </div>
-                        <div style="background-color: #87CEEB; padding: 10px; margin-bottom: 10px;">
-                            <p style="color: black; font-weight: bold;">URL: ${env.BUILD_URL}</p>
-                        </div>
-                    </body>
-                    </html>
-            """,
-            to: 'messier877@gmail.com',
-            mimeType: 'text/html'
-            }
+                    <html><body>
+                    <p><b>Deployment successful!</b></p>
+                    <p>Backend Image: wanderlust-backend-beta:${params.BACKEND_DOCKER_TAG}</p>
+                    <p>Frontend Image: wanderlust-frontend-beta:${params.FRONTEND_DOCKER_TAG}</p>
+                    </body></html>
+                """,
+                to: 'messier877@gmail.com',
+                mimeType: 'text/html'
+            )
         }
-      failure {
-            script {
-                emailext attachLog: true,
-                from: 'messier877@gmail.com',
-                subject: "Wanderlust Application build failed - '${currentBuild.result}'",
-                body: """
-                    <html>
-                    <body>
-                        <div style="background-color: #FFA07A; padding: 10px; margin-bottom: 10px;">
-                            <p style="color: black; font-weight: bold;">Project: ${env.JOB_NAME}</p>
-                        </div>
-                        <div style="background-color: #90EE90; padding: 10px; margin-bottom: 10px;">
-                            <p style="color: black; font-weight: bold;">Build Number: ${env.BUILD_NUMBER}</p>
-                        </div>
-                    </body>
-                    </html>
-            """,
-            to: 'messier877@gmail.com',
-            mimeType: 'text/html'
-            }
+
+        failure {
+            emailext(
+                attachLog: true,
+                subject: "❌ Wanderlust deployment failed on Minikube",
+                body: "Please check Jenkins logs for details.",
+                to: 'messier877@gmail.com'
+            )
         }
     }
 }
