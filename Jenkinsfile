@@ -97,11 +97,11 @@ pipeline {
             steps{
                 script{
                         dir('backend'){
-                            docker_build("wanderlust-backend-beta","${params.BACKEND_DOCKER_TAG}","dockerdaku877)
+                            docker_build("wanderlust-backend-beta","${params.BACKEND_DOCKER_TAG}","dockerdaku877")
                         }
                     
                         dir('frontend'){
-                            docker_build("wanderlust-frontend-beta","${params.FRONTEND_DOCKER_TAG}","dockerdaku877)
+                            docker_build("wanderlust-frontend-beta","${params.FRONTEND_DOCKER_TAG}","dockerdaku877")
                         }
                 }
             }
