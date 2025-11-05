@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the IP of the Target VM (where frontend runs)
-target_vm_ip="192.168.1.102"
+target_vm_ip="192.168.1.101"
 
 # Path to the backend .env file
 file_to_find="../backend/.env.docker"
