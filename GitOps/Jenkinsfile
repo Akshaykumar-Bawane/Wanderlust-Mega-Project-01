@@ -35,6 +35,28 @@ pipeline {
             }
         }
 
+        stage("Git: Code update and push to GitHub") {
+            steps {
+                script {
+                    withCredentials([gitUsernamePassword(credentialsId: 'Github-cred', gitToolName: 'Default')]) {
+                        sh """
+                            echo "Checking repo status..."
+                            git status
+
+                            echo "Adding modified files..."
+                            git add kubernetes/*.yaml
+
+                            echo "Committing changes..."
+                            git commit -m "Updated Kubernetes manifests with new image tags"
+
+                            echo "Pushing updates to GitHub..."
+                            git push https://github.com/Akshaykumar-Bawane/Wanderlust-Mega-Project-01.git main
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Deploy to Minikube Cluster') {
             steps {
                 script {
@@ -42,10 +64,10 @@ pipeline {
                     sh """
                         kubectl apply -f kubernetes/backend.yaml
                         kubectl apply -f kubernetes/frontend.yaml
-                        
+
                         echo "\\nCurrent pods status:"
                         kubectl get pods -o wide
-                        
+
                         echo "\\nCurrent services:"
                         kubectl get svc -o wide
                     """
@@ -81,3 +103,4 @@ pipeline {
         }
     }
 }
+
