@@ -3,7 +3,7 @@ pipeline {
     agent {label 'vinod'}
     
     environment{
-        SONAR_HOME = tool "Sonar_Server"
+        SONAR_HOME = tool "Sonar"
     }
     
     parameters {
